@@ -42,7 +42,7 @@ var noteListCmd = &cobra.Command{
 		}
 
 		var notes []models.Note
-		if err := client.Get("/api/notes", &notes, true); err != nil {
+		if err := client.Get("/notes", &notes, true); err != nil {
 			return fmt.Errorf("failed to list notes: %w", err)
 		}
 
@@ -146,7 +146,7 @@ var noteCreateCmd = &cobra.Command{
 		}
 
 		var created models.Note
-		if err := client.Post("/api/notes", req, &created, true); err != nil {
+		if err := client.Post("/notes", req, &created, true); err != nil {
 			return fmt.Errorf("failed to create note: %w", err)
 		}
 
@@ -174,7 +174,7 @@ var noteUpdateCmd = &cobra.Command{
 
 		// Get current note
 		var current models.Note
-		if err := client.Get("/api/notes/"+id, &current, true); err != nil {
+		if err := client.Get("/notes/"+id, &current, true); err != nil {
 			return fmt.Errorf("failed to get note: %w", err)
 		}
 
@@ -224,7 +224,7 @@ var noteUpdateCmd = &cobra.Command{
 		}
 
 		var updated models.Note
-		if err := client.Put("/api/notes/"+id, req, &updated, true); err != nil {
+		if err := client.Put("/notes/"+id, req, &updated, true); err != nil {
 			return fmt.Errorf("failed to update note: %w", err)
 		}
 
@@ -259,7 +259,7 @@ var noteDeleteCmd = &cobra.Command{
 			return nil
 		}
 
-		if err := client.Delete("/api/notes/"+id, nil, true); err != nil {
+		if err := client.Delete("/notes/"+id, nil, true); err != nil {
 			return fmt.Errorf("failed to delete note: %w", err)
 		}
 
@@ -282,7 +282,7 @@ var noteRemindersCmd = &cobra.Command{
 		}
 
 		var notes []models.Note
-		if err := client.Get("/api/notes/reminders", &notes, true); err != nil {
+		if err := client.Get("/notes/reminders", &notes, true); err != nil {
 			return fmt.Errorf("failed to get reminders: %w", err)
 		}
 

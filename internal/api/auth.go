@@ -25,7 +25,7 @@ func (a *AuthAPI) Login(email, password string) (*models.LoginResponse, error) {
 	}
 
 	var resp models.LoginResponse
-	if err := a.Client.Post("/api/auth/login", req, &resp, false); err != nil {
+	if err := a.Client.Post("/auth/login", req, &resp, false); err != nil {
 		return nil, err
 	}
 
@@ -34,13 +34,13 @@ func (a *AuthAPI) Login(email, password string) (*models.LoginResponse, error) {
 
 // Logout invalidates the current token
 func (a *AuthAPI) Logout() error {
-	return a.Client.Post("/api/auth/logout", nil, nil, true)
+	return a.Client.Post("/auth/logout", nil, nil, true)
 }
 
 // Me gets the current user profile
 func (a *AuthAPI) Me() (*models.User, error) {
 	var user models.User
-	if err := a.Client.Get("/api/auth/me", &user, true); err != nil {
+	if err := a.Client.Get("/auth/me", &user, true); err != nil {
 		return nil, err
 	}
 	return &user, nil
@@ -49,7 +49,7 @@ func (a *AuthAPI) Me() (*models.User, error) {
 // UpdateProfile updates the user profile
 func (a *AuthAPI) UpdateProfile(req models.UpdateProfileRequest) (*models.User, error) {
 	var user models.User
-	if err := a.Client.Put("/api/auth/profile", req, &user, true); err != nil {
+	if err := a.Client.Put("/auth/profile", req, &user, true); err != nil {
 		return nil, err
 	}
 	return &user, nil
@@ -61,7 +61,7 @@ func (a *AuthAPI) ChangePassword(currentPassword, newPassword string) error {
 		CurrentPassword: currentPassword,
 		NewPassword:     newPassword,
 	}
-	return a.Client.Put("/api/auth/change-password", req, nil, true)
+	return a.Client.Put("/auth/change-password", req, nil, true)
 }
 
 // SaveLogin saves login credentials to config
@@ -101,7 +101,7 @@ func (a *AuthAPI) CheckAuth() error {
 
 // refreshToken refreshes the access token
 func (a *AuthAPI) refreshToken() error {
-	url := "/api/auth/refresh"
+	url := "/auth/refresh"
 
 	req := models.RefreshTokenRequest{
 		RefreshToken: a.Client.Config.Auth.RefreshToken,

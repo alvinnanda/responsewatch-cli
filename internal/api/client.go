@@ -59,7 +59,7 @@ func (c *Client) doRequest(method, path string, body interface{}, auth bool) (*h
 
 	if auth && c.Config.Auth.Token != "" {
 		// Check if token needs refresh
-		if c.Config.Auth.ExpiresAt.Before(time.Now().Add(5 * time.Minute)) && c.Config.Auth.RefreshToken != "" {
+		if c.Config.Auth.ExpiresAt.Before(time.Now().Add(5*time.Minute)) && c.Config.Auth.RefreshToken != "" {
 			if err := c.refreshToken(); err != nil {
 				return nil, fmt.Errorf("token expired and refresh failed: %w", err)
 			}
@@ -72,7 +72,7 @@ func (c *Client) doRequest(method, path string, body interface{}, auth bool) (*h
 
 // refreshToken refreshes the access token
 func (c *Client) refreshToken() error {
-	url := c.BaseURL + "/api/auth/refresh"
+	url := c.BaseURL + "/auth/refresh"
 
 	reqBody := models.RefreshTokenRequest{
 		RefreshToken: c.Config.Auth.RefreshToken,

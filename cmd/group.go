@@ -42,7 +42,7 @@ var groupListCmd = &cobra.Command{
 		}
 
 		var groups []models.VendorGroup
-		if err := client.Get("/api/vendor-groups", &groups, true); err != nil {
+		if err := client.Get("/vendor-groups", &groups, true); err != nil {
 			return fmt.Errorf("failed to list groups: %w", err)
 		}
 
@@ -100,7 +100,7 @@ var groupGetCmd = &cobra.Command{
 		}
 
 		var group models.VendorGroup
-		if err := client.Get("/api/vendor-groups/"+id, &group, true); err != nil {
+		if err := client.Get("/vendor-groups/"+id, &group, true); err != nil {
 			return fmt.Errorf("failed to get group: %w", err)
 		}
 
@@ -184,7 +184,7 @@ var groupCreateCmd = &cobra.Command{
 		}
 
 		var created models.VendorGroup
-		if err := client.Post("/api/vendor-groups", req, &created, true); err != nil {
+		if err := client.Post("/vendor-groups", req, &created, true); err != nil {
 			return fmt.Errorf("failed to create group: %w", err)
 		}
 
@@ -212,7 +212,7 @@ var groupUpdateCmd = &cobra.Command{
 
 		// Get current group
 		var current models.VendorGroup
-		if err := client.Get("/api/vendor-groups/"+id, &current, true); err != nil {
+		if err := client.Get("/vendor-groups/"+id, &current, true); err != nil {
 			return fmt.Errorf("failed to get group: %w", err)
 		}
 
@@ -269,7 +269,7 @@ var groupUpdateCmd = &cobra.Command{
 		}
 
 		var updated models.VendorGroup
-		if err := client.Put("/api/vendor-groups/"+id, req, &updated, true); err != nil {
+		if err := client.Put("/vendor-groups/"+id, req, &updated, true); err != nil {
 			return fmt.Errorf("failed to update group: %w", err)
 		}
 
@@ -309,7 +309,7 @@ var groupDeleteCmd = &cobra.Command{
 			return nil
 		}
 
-		if err := client.Delete("/api/vendor-groups/"+id, nil, true); err != nil {
+		if err := client.Delete("/vendor-groups/"+id, nil, true); err != nil {
 			return fmt.Errorf("failed to delete group: %w", err)
 		}
 

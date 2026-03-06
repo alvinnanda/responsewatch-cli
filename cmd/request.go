@@ -60,14 +60,14 @@ var requestListCmd = &cobra.Command{
 		}
 
 		var result models.ListResponse
-		if err := client.Get("/api/requests"+query, &result, true); err != nil {
+		if err := client.Get("/requests"+query, &result, true); err != nil {
 			return fmt.Errorf("failed to list requests: %w", err)
 		}
 
 		requests, ok := result.Data.([]interface{})
 		if !ok {
 			// Try direct array
-			if err := client.Get("/api/requests"+query, &requests, true); err != nil {
+			if err := client.Get("/requests"+query, &requests, true); err != nil {
 				return fmt.Errorf("failed to parse requests: %w", err)
 			}
 		}
@@ -137,7 +137,7 @@ var requestGetCmd = &cobra.Command{
 		}
 
 		var req models.Request
-		if err := client.Get("/api/requests/"+id, &req, true); err != nil {
+		if err := client.Get("/requests/"+id, &req, true); err != nil {
 			return fmt.Errorf("failed to get request: %w", err)
 		}
 
@@ -216,7 +216,7 @@ var requestCreateCmd = &cobra.Command{
 		}
 
 		var created models.Request
-		if err := client.Post("/api/requests", req, &created, true); err != nil {
+		if err := client.Post("/requests", req, &created, true); err != nil {
 			return fmt.Errorf("failed to create request: %w", err)
 		}
 
@@ -247,7 +247,7 @@ var requestUpdateCmd = &cobra.Command{
 
 		// Get current request
 		var current models.Request
-		if err := client.Get("/api/requests/"+id, &current, true); err != nil {
+		if err := client.Get("/requests/"+id, &current, true); err != nil {
 			return fmt.Errorf("failed to get request: %w", err)
 		}
 
@@ -290,7 +290,7 @@ var requestUpdateCmd = &cobra.Command{
 		}
 
 		var updated models.Request
-		if err := client.Put("/api/requests/"+id, req, &updated, true); err != nil {
+		if err := client.Put("/requests/"+id, req, &updated, true); err != nil {
 			return fmt.Errorf("failed to update request: %w", err)
 		}
 
@@ -325,7 +325,7 @@ var requestDeleteCmd = &cobra.Command{
 			return nil
 		}
 
-		if err := client.Delete("/api/requests/"+uuid, nil, true); err != nil {
+		if err := client.Delete("/requests/"+uuid, nil, true); err != nil {
 			return fmt.Errorf("failed to delete request: %w", err)
 		}
 
@@ -351,7 +351,7 @@ var requestReopenCmd = &cobra.Command{
 		}
 
 		var req models.Request
-		if err := client.Put("/api/requests/"+id+"/reopen", nil, &req, true); err != nil {
+		if err := client.Put("/requests/"+id+"/reopen", nil, &req, true); err != nil {
 			return fmt.Errorf("failed to reopen request: %w", err)
 		}
 
@@ -385,7 +385,7 @@ var requestAssignCmd = &cobra.Command{
 		}
 
 		var updated models.Request
-		if err := client.Put("/api/requests/"+id+"/assign-vendor", req, &updated, true); err != nil {
+		if err := client.Put("/requests/"+id+"/assign-vendor", req, &updated, true); err != nil {
 			return fmt.Errorf("failed to assign vendor: %w", err)
 		}
 
@@ -411,7 +411,7 @@ var requestStatsCmd = &cobra.Command{
 
 		if premium {
 			var stats models.RequestStatsPremium
-			if err := client.Get("/api/requests/stats/premium", &stats, true); err != nil {
+			if err := client.Get("/requests/stats/premium", &stats, true); err != nil {
 				return fmt.Errorf("failed to get premium stats: %w", err)
 			}
 
@@ -422,7 +422,7 @@ var requestStatsCmd = &cobra.Command{
 			printPremiumStats(&stats)
 		} else {
 			var stats models.RequestStats
-			if err := client.Get("/api/requests/stats", &stats, true); err != nil {
+			if err := client.Get("/requests/stats", &stats, true); err != nil {
 				return fmt.Errorf("failed to get stats: %w", err)
 			}
 
@@ -462,7 +462,7 @@ var requestExportCmd = &cobra.Command{
 		}
 
 		// Download file
-		resp, err := client.HTTPClient.Get(client.BaseURL + "/api/requests/export")
+		resp, err := client.HTTPClient.Get(client.BaseURL + "/requests/export")
 		if err != nil {
 			return fmt.Errorf("failed to export: %w", err)
 		}
@@ -511,7 +511,7 @@ var requestStartCmd = &cobra.Command{
 		}
 
 		var result models.Request
-		if err := client.Post("/api/public/t/"+token+"/start", req, &result, false); err != nil {
+		if err := client.Post("/public/t/"+token+"/start", req, &result, false); err != nil {
 			return fmt.Errorf("failed to start request: %w", err)
 		}
 
@@ -546,7 +546,7 @@ var requestFinishCmd = &cobra.Command{
 		}
 
 		var result models.Request
-		if err := client.Post("/api/public/t/"+token+"/finish", req, &result, false); err != nil {
+		if err := client.Post("/public/t/"+token+"/finish", req, &result, false); err != nil {
 			return fmt.Errorf("failed to finish request: %w", err)
 		}
 
@@ -561,12 +561,12 @@ func printRequestDetails(req *models.Request) {
 	color.Cyan("===============\n")
 
 	data := map[string]string{
-		"ID":      fmt.Sprintf("%d", req.ID),
-		"UUID":    req.UUID,
-		"Title":   req.Title,
-		"Status":  formatter.StatusColor(req.Status),
-		"Group":   req.GroupName,
-		"PIC":     req.PIC,
+		"ID":       fmt.Sprintf("%d", req.ID),
+		"UUID":     req.UUID,
+		"Title":    req.Title,
+		"Status":   formatter.StatusColor(req.Status),
+		"Group":    req.GroupName,
+		"PIC":      req.PIC,
 		"Ref Link": req.RefLink,
 	}
 

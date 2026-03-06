@@ -25,14 +25,14 @@ Shows requests grouped by status: Waiting, In Progress, and Done.`,
 
 		// Get monitoring data
 		var result models.ListResponse
-		if err := client.Get("/api/requests?limit=100", &result, true); err != nil {
+		if err := client.Get("/requests?limit=100", &result, true); err != nil {
 			return fmt.Errorf("failed to get requests: %w", err)
 		}
 
 		requests, ok := result.Data.([]interface{})
 		if !ok {
 			// Try direct array
-			if err := client.Get("/api/requests?limit=100", &requests, true); err != nil {
+			if err := client.Get("/requests?limit=100", &requests, true); err != nil {
 				return fmt.Errorf("failed to parse requests: %w", err)
 			}
 		}
@@ -80,7 +80,7 @@ var monitorPublicCmd = &cobra.Command{
 		client := api.NewClient(cfg)
 
 		var result models.PublicMonitoringResponse
-		if err := client.Get("/api/public/monitoring/"+username, &result, false); err != nil {
+		if err := client.Get("/public/monitoring/"+username, &result, false); err != nil {
 			return fmt.Errorf("failed to get public monitoring: %w", err)
 		}
 
@@ -224,8 +224,8 @@ func repeatString(s string, count int) string {
 
 func requestToMap(r models.Request) map[string]interface{} {
 	return map[string]interface{}{
-		"id":    float64(r.ID),
-		"title": r.Title,
+		"id":     float64(r.ID),
+		"title":  r.Title,
 		"status": r.Status,
 	}
 }

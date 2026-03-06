@@ -35,7 +35,7 @@ var notifListCmd = &cobra.Command{
 		}
 
 		var notifications []models.Notification
-		if err := client.Get("/api/notifications", &notifications, true); err != nil {
+		if err := client.Get("/notifications", &notifications, true); err != nil {
 			return fmt.Errorf("failed to list notifications: %w", err)
 		}
 
@@ -91,7 +91,7 @@ var notifUnreadCmd = &cobra.Command{
 		var result struct {
 			Count int `json:"count"`
 		}
-		if err := client.Get("/api/notifications/unread-count", &result, true); err != nil {
+		if err := client.Get("/notifications/unread-count", &result, true); err != nil {
 			return fmt.Errorf("failed to get unread count: %w", err)
 		}
 
@@ -128,7 +128,7 @@ var notifReadCmd = &cobra.Command{
 			return err
 		}
 
-		if err := client.Post("/api/notifications/"+id+"/read", nil, nil, true); err != nil {
+		if err := client.Post("/notifications/"+id+"/read", nil, nil, true); err != nil {
 			return fmt.Errorf("failed to mark notification as read: %w", err)
 		}
 
@@ -159,7 +159,7 @@ var notifReadAllCmd = &cobra.Command{
 			return nil
 		}
 
-		if err := client.Post("/api/notifications/read-all", nil, nil, true); err != nil {
+		if err := client.Post("/notifications/read-all", nil, nil, true); err != nil {
 			return fmt.Errorf("failed to mark all as read: %w", err)
 		}
 

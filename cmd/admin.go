@@ -11,9 +11,9 @@ import (
 
 // adminCmd represents the admin command
 var adminCmd = &cobra.Command{
-	Use:     "admin",
-	Short:   "Admin commands",
-	Long:    `Administrative commands for managing users (Admin role only).`,
+	Use:   "admin",
+	Short: "Admin commands",
+	Long:  `Administrative commands for managing users (Admin role only).`,
 }
 
 // adminUsersCmd represents the admin users command
@@ -30,7 +30,7 @@ var adminUsersCmd = &cobra.Command{
 		}
 
 		var users []models.User
-		if err := client.Get("/api/admin/users", &users, true); err != nil {
+		if err := client.Get("/admin/users", &users, true); err != nil {
 			return fmt.Errorf("failed to list users: %w", err)
 		}
 
@@ -87,7 +87,7 @@ var adminUpgradeCmd = &cobra.Command{
 			return err
 		}
 
-		if err := client.Post("/api/admin/users/"+userID+"/upgrade", nil, nil, true); err != nil {
+		if err := client.Post("/admin/users/"+userID+"/upgrade", nil, nil, true); err != nil {
 			return fmt.Errorf("failed to upgrade user: %w", err)
 		}
 
