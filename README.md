@@ -18,23 +18,23 @@ Official command-line interface for ResponseWatch - manage tickets from your ter
 ### macOS / Linux
 
 ```bash
-curl -sSfL https://response-watch.web.app/install.sh | sh
+curl -sSfL https://raw.githubusercontent.com/alvinnanda/responsewatch-cli/main/install.sh | sh
 ```
 
 ### Windows (PowerShell)
 
 ```powershell
-iwr -useb https://response-watch.web.app/install.ps1 | iex
+iwr -useb https://raw.githubusercontent.com/alvinnanda/responsewatch-cli/main/install.ps1 | iex
 ```
 
 ### Manual
 
-Download the latest binary from [GitHub Releases](https://github.com/boscod/responsewatch-cli/releases) and add to your PATH.
+Download the latest binary from [GitHub Releases](https://github.com/alvinnanda/responsewatch-cli/releases) and add to your PATH.
 
 ### Build from Source
 
 ```bash
-git clone https://github.com/boscod/responsewatch-cli.git
+git clone https://github.com/alvinnanda/responsewatch-cli.git
 cd responsewatch-cli
 go build -o rwcli .
 ```
