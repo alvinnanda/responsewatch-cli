@@ -1,0 +1,60 @@
+# GoReleaser configuration
+project_name: rwcli
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  - id: rwcli
+    main: .
+    binary: rwcli
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - darwin
+      - linux
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    ignore:
+      - goos: windows
+        goarch: arm64
+    ldflags:
+      - -s -w -X main.version={{.Version}}
+
+archives:
+  - id: rwcli
+    name_template: >-
+      {{ .ProjectName }}_
+      {{- .Os }}_
+      {{- .Arch }}
+    format_overrides:
+      - goos: windows
+        format: zip
+    files:
+      - README.md
+
+checksum:
+  name_template: 'checksums.txt'
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - '^docs:'
+      - '^test:'
+      - '^chore:'
+
+brews:
+  - name: rwcli
+    tap:
+      owner: boscod
+      name: homebrew-tap
+    folder: Formula
+    homepage: https://response-watch.web.app
+    description: ResponseWatch CLI - Manage tickets from your terminal
+    license: MIT
+    test: |
+      system "#{bin}/rwcli --version"

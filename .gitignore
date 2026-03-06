@@ -1,0 +1,18 @@
+# Compiled binaries
+rwcli
+rwcli.exe
+dist/
+*.exe
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Temp
+tmp/
