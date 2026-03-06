@@ -151,15 +151,24 @@ var meCmd = &cobra.Command{
 		}
 
 		// Print profile in table format
+		fullName := "-"
+		if user.FullName != nil {
+			fullName = *user.FullName
+		}
+		org := "-"
+		if user.Organization != nil {
+			org = *user.Organization
+		}
+		
 		data := map[string]string{
 			"ID":           fmt.Sprintf("%d", user.ID),
 			"Username":     user.Username,
 			"Email":        user.Email,
-			"Full Name":    user.FullName,
-			"Organization": user.Organization,
+			"Full Name":    fullName,
+			"Organization": org,
 			"Role":         user.Role,
 			"Active":       fmt.Sprintf("%t", user.IsActive),
-			"Created At":   user.CreatedAt.Format("2006-01-02 15:04:05"),
+			"Created At":   formatTime(user.CreatedAt),
 		}
 
 		color.Cyan("\nProfile Information\n")
@@ -201,24 +210,35 @@ var profileUpdateCmd = &cobra.Command{
 		}
 
 		// Get full name
-		fmt.Printf("Full Name [%s]: ", currentUser.FullName)
+		currentFullName := ""
+		if currentUser.FullName != nil {
+			currentFullName = *currentUser.FullName
+		}
+		fmt.Printf("Full Name [%s]: ", currentFullName)
 		fullName, _ := reader.ReadString('\n')
 		fullName = strings.TrimSpace(fullName)
 		if fullName == "" {
-			fullName = currentUser.FullName
+			fullName = currentFullName
 		}
 
 		// Get organization
-		fmt.Printf("Organization [%s]: ", currentUser.Organization)
+		currentOrg := ""
+		if currentUser.Organization != nil {
+			currentOrg = *currentUser.Organization
+		}
+		fmt.Printf("Organization [%s]: ", currentOrg)
 		org, _ := reader.ReadString('\n')
 		org = strings.TrimSpace(org)
 		if org == "" {
-			org = currentUser.Organization
+			org = currentOrg
 		}
 
-		req := models.UpdateProfileRequest{
-			FullName:     fullName,
-			Organization: org,
+		req := models.UpdateProfileRequest{}
+		if fullName != "" {
+			req.FullName = &fullName
+		}
+		if org != "" {
+			req.Organization = &org
 		}
 
 		user, err := authAPI.UpdateProfile(req)
@@ -227,8 +247,10 @@ var profileUpdateCmd = &cobra.Command{
 		}
 
 		// Update local config
-		cfg.User.Name = user.FullName
-		_ = cfg.Save()
+		if user.FullName != nil {
+			cfg.User.Name = *user.FullName
+			_ = cfg.Save()
+		}
 
 		formatter.PrintSuccess("Profile updated successfully")
 		return nil

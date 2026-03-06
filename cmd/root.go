@@ -100,3 +100,15 @@ func truncateString(s string, maxLen int) string {
 	}
 	return s[:maxLen-3] + "..."
 }
+
+// formatTime formats a time string (RFC3339) to a shorter format
+func formatTime(t string) string {
+	if t == "" {
+		return "-"
+	}
+	// If it's RFC3339 format, extract just the date part
+	if len(t) >= 10 {
+		return t[:10] // Return YYYY-MM-DD
+	}
+	return t
+}

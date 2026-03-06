@@ -52,12 +52,17 @@ var adminUsersCmd = &cobra.Command{
 			if !u.IsActive {
 				active = color.RedString("No")
 			}
+			
+			fullName := "-"
+			if u.FullName != nil {
+				fullName = *u.FullName
+			}
 
 			rows = append(rows, []string{
 				fmt.Sprintf("%d", u.ID),
 				u.Username,
 				u.Email,
-				u.FullName,
+				fullName,
 				u.Role,
 				active,
 			})

@@ -70,13 +70,6 @@ func (f *Formatter) PrintInfo(message string) {
 // Table creates a new table writer
 func (f *Formatter) Table() *tablewriter.Table {
 	table := tablewriter.NewWriter(os.Stdout)
-	
-	if f.Color {
-		table.SetHeaderColor(
-			tablewriter.Colors{tablewriter.Bold, tablewriter.FgCyanColor},
-		)
-	}
-	
 	return table
 }
 
@@ -111,7 +104,7 @@ func (f *Formatter) PrintTable(headers []string, rows [][]string) {
 	table.SetBorder(false)
 	table.SetTablePadding("\t")
 	table.SetNoWhiteSpace(true)
-	
+
 	table.AppendBulk(rows)
 	table.Render()
 }

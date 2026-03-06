@@ -24,40 +24,26 @@ Shows requests grouped by status: Waiting, In Progress, and Done.`,
 		}
 
 		// Get monitoring data
-		var result models.ListResponse
+		var result models.RequestListResponse
 		if err := client.Get("/requests?limit=100", &result, true); err != nil {
 			return fmt.Errorf("failed to get requests: %w", err)
 		}
 
-		requests, ok := result.Data.([]interface{})
-		if !ok {
-			// Try direct array
-			if err := client.Get("/requests?limit=100", &requests, true); err != nil {
-				return fmt.Errorf("failed to parse requests: %w", err)
-			}
-		}
-
 		if outputFmt == "json" {
-			return formatter.PrintJSON(result.Data)
+			return formatter.PrintJSON(result)
 		}
 
 		// Categorize requests
-		var waiting, inProgress, done []map[string]interface{}
+		var waiting, inProgress, done []models.Request
 
-		for _, r := range requests {
-			reqMap, ok := r.(map[string]interface{})
-			if !ok {
-				continue
-			}
-
-			status := getString(reqMap, "status")
-			switch status {
-			case "waiting":
-				waiting = append(waiting, reqMap)
+		for _, r := range result.Requests {
+			switch r.Status {
+			case "waiting", "scheduled":
+				waiting = append(waiting, r)
 			case "in_progress":
-				inProgress = append(inProgress, reqMap)
+				inProgress = append(inProgress, r)
 			case "done":
-				done = append(done, reqMap)
+				done = append(done, r)
 			}
 		}
 
@@ -100,7 +86,7 @@ var monitorPublicCmd = &cobra.Command{
 		var waiting, inProgress, done []models.Request
 		for _, r := range result.Requests {
 			switch r.Status {
-			case "waiting":
+			case "waiting", "scheduled":
 				waiting = append(waiting, r)
 			case "in_progress":
 				inProgress = append(inProgress, r)
@@ -109,25 +95,13 @@ var monitorPublicCmd = &cobra.Command{
 			}
 		}
 
-		// Convert to interface for printKanbanBoard
-		var w, ip, d []map[string]interface{}
-		for _, r := range waiting {
-			w = append(w, requestToMap(r))
-		}
-		for _, r := range inProgress {
-			ip = append(ip, requestToMap(r))
-		}
-		for _, r := range done {
-			d = append(d, requestToMap(r))
-		}
-
-		printKanbanBoard(w, ip, d)
+		printKanbanBoard(waiting, inProgress, done)
 
 		return nil
 	},
 }
 
-func printKanbanBoard(waiting, inProgress, done []map[string]interface{}) {
+func printKanbanBoard(waiting, inProgress, done []models.Request) {
 	// Print header
 	fmt.Println()
 	color.Yellow("═══════════════════════════════════════════════════════════════════════════")
@@ -192,11 +166,11 @@ func printColumnHeader(title string, count int, colorFunc func(string, ...interf
 	fmt.Print(padString(text, width))
 }
 
-func printCard(req map[string]interface{}, width int) {
-	id := fmt.Sprintf("%.0f", req["id"])
-	title := getString(req, "title")
-	if len(title) > width-4 {
-		title = title[:width-7] + "..."
+func printCard(req models.Request, width int) {
+	id := fmt.Sprintf("%d", req.ID)
+	title := req.Title
+	if len(title) > width-6 {
+		title = title[:width-9] + "..."
 	}
 
 	card := fmt.Sprintf(" #%s %s ", id, title)
@@ -220,14 +194,6 @@ func repeatString(s string, count int) string {
 		result += s
 	}
 	return result
-}
-
-func requestToMap(r models.Request) map[string]interface{} {
-	return map[string]interface{}{
-		"id":     float64(r.ID),
-		"title":  r.Title,
-		"status": r.Status,
-	}
 }
 
 func init() {

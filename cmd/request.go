@@ -14,18 +14,19 @@ import (
 )
 
 var (
-	reqTitle       string
-	reqDesc        string
-	reqGroup       int
-	reqPIC         string
-	reqRefLink     string
-	reqPin         bool
-	reqScheduled   bool
-	reqScheduledAt string
-	reqStatus      string
-	reqPage        int
-	reqLimit       int
-	reqSearch      string
+	reqTitle               string
+	reqDesc                string
+	reqGroup               int64
+	reqPIC                 string
+	reqRefLink             string
+	reqPin                 bool
+	reqScheduled           bool
+	reqScheduledAt         string
+	reqStatus              string
+	reqPage                int
+	reqLimit               int
+	reqSearch              string
+	reqIsDescriptionSecure bool
 )
 
 // requestCmd represents the request command
@@ -59,59 +60,47 @@ var requestListCmd = &cobra.Command{
 			query += "&search=" + reqSearch
 		}
 
-		var result models.ListResponse
+		var result models.RequestListResponse
 		if err := client.Get("/requests"+query, &result, true); err != nil {
 			return fmt.Errorf("failed to list requests: %w", err)
 		}
 
-		requests, ok := result.Data.([]interface{})
-		if !ok {
-			// Try direct array
-			if err := client.Get("/requests"+query, &requests, true); err != nil {
-				return fmt.Errorf("failed to parse requests: %w", err)
-			}
-		}
-
-		if len(requests) == 0 {
+		if len(result.Requests) == 0 {
 			formatter.PrintInfo("No requests found")
 			return nil
 		}
 
 		if outputFmt == "json" {
-			return formatter.PrintJSON(result.Data)
+			return formatter.PrintJSON(result)
 		}
 
 		// Print table
-		headers := []string{"ID", "TITLE", "STATUS", "GROUP", "PIC", "CREATED"}
+		headers := []string{"ID", "TITLE", "STATUS", "VENDOR", "DURATION", "CREATED"}
 		rows := [][]string{}
 
-		for _, r := range requests {
-			reqMap, ok := r.(map[string]interface{})
-			if !ok {
-				continue
+		for _, r := range result.Requests {
+			vendor := "-"
+			if r.VendorName != nil && *r.VendorName != "" {
+				vendor = *r.VendorName
 			}
 
-			id := fmt.Sprintf("%.0f", reqMap["id"])
-			title := output.TruncateString(getString(reqMap, "title"), 30)
-			status := getString(reqMap, "status")
-			group := getString(reqMap, "group_name")
-			pic := getString(reqMap, "pic")
-			if pic == "" {
-				pic = "-"
+			duration := "-"
+			if r.DurationSeconds != nil && *r.DurationSeconds > 0 {
+				duration = output.DurationString(*r.DurationSeconds)
 			}
-			created := formatTime(getString(reqMap, "created_at"))
 
 			rows = append(rows, []string{
-				id,
-				title,
-				formatter.StatusColor(status),
-				group,
-				pic,
-				created,
+				fmt.Sprintf("%d", r.ID),
+				truncateString(r.Title, 30),
+				formatter.StatusColor(r.Status),
+				vendor,
+				duration,
+				formatTime(r.CreatedAt),
 			})
 		}
 
-		color.Cyan("\nYour Requests (Total: %d)\n", result.Total)
+		color.Cyan("\nYour Requests (Page %d/%d, Total: %d)\n",
+			result.Pagination.Page, result.Pagination.TotalPages, result.Pagination.Total)
 		formatter.PrintTable(headers, rows)
 		fmt.Println()
 
@@ -185,34 +174,28 @@ var requestCreateCmd = &cobra.Command{
 		}
 
 		if reqRefLink == "" {
-			fmt.Print("Ref Link (optional): ")
+			fmt.Print("Followup Link (optional): ")
 			link, _ := reader.ReadString('\n')
 			reqRefLink = strings.TrimSpace(link)
 		}
 
-		if !cmd.Flags().Changed("pin") {
-			fmt.Print("Pin this request? [y/N]: ")
-			pin, _ := reader.ReadString('\n')
-			reqPin = strings.ToLower(strings.TrimSpace(pin)) == "y"
-		}
-
 		// Build request
 		req := models.CreateRequestRequest{
-			Title:       reqTitle,
-			Description: reqDesc,
-			RefLink:     reqRefLink,
-			IsPinned:    reqPin,
+			Title:               reqTitle,
+			IsDescriptionSecure: reqIsDescriptionSecure,
 		}
 
-		if reqGroup > 0 {
-			req.GroupID = &reqGroup
+		if reqDesc != "" {
+			req.Description = &reqDesc
 		}
-		if reqPIC != "" {
-			req.PIC = reqPIC
+		if reqRefLink != "" {
+			req.FollowupLink = &reqRefLink
+		}
+		if reqGroup > 0 {
+			req.VendorGroupID = &reqGroup
 		}
 		if reqScheduled && reqScheduledAt != "" {
-			req.IsScheduled = true
-			req.ScheduledDate = reqScheduledAt
+			req.ScheduledTime = &reqScheduledAt
 		}
 
 		var created models.Request
@@ -221,7 +204,7 @@ var requestCreateCmd = &cobra.Command{
 		}
 
 		formatter.PrintSuccess(fmt.Sprintf("Request created: %s", created.Title))
-		fmt.Printf("\nPublic URL: %s\n", created.PublicURL)
+		fmt.Printf("\nPublic URL: https://response-watch.web.app/t/%s\n", created.URLToken)
 		fmt.Printf("Token: %s\n\n", created.URLToken)
 
 		return nil
@@ -267,26 +250,28 @@ var requestUpdateCmd = &cobra.Command{
 		}
 
 		if cmd.Flags().Changed("desc") {
-			req.Description = reqDesc
+			if reqDesc != "" {
+				req.Description = &reqDesc
+			}
 		} else {
-			fmt.Printf("Description [%s]: ", current.Description)
-			desc, _ := reader.ReadString('\n')
-			desc = strings.TrimSpace(desc)
-			if desc != "" {
-				req.Description = desc
+			desc := ""
+			if current.Description != nil {
+				desc = *current.Description
+			}
+			fmt.Printf("Description [%s]: ", truncateString(desc, 30))
+			newDesc, _ := reader.ReadString('\n')
+			newDesc = strings.TrimSpace(newDesc)
+			if newDesc != "" {
+				req.Description = &newDesc
 			}
 		}
 
-		if cmd.Flags().Changed("ref-link") {
-			req.RefLink = reqRefLink
+		if cmd.Flags().Changed("ref-link") && reqRefLink != "" {
+			req.FollowupLink = &reqRefLink
 		}
 
 		if cmd.Flags().Changed("group") && reqGroup > 0 {
-			req.GroupID = &reqGroup
-		}
-
-		if cmd.Flags().Changed("pic") {
-			req.PIC = reqPIC
+			req.VendorGroupID = &reqGroup
 		}
 
 		var updated models.Request
@@ -378,7 +363,7 @@ var requestAssignCmd = &cobra.Command{
 
 		req := models.AssignVendorRequest{}
 		if reqGroup > 0 {
-			req.GroupID = &reqGroup
+			req.VendorGroupID = &reqGroup
 		}
 		if reqPIC != "" {
 			req.PIC = reqPIC
@@ -432,10 +417,10 @@ var requestStatsCmd = &cobra.Command{
 
 			color.Cyan("\nRequest Statistics\n")
 			color.Cyan("==================\n")
-			fmt.Printf("Total:      %d\n", stats.Total)
-			fmt.Printf("Waiting:    %d\n", stats.Waiting)
+			fmt.Printf("Total:       %d\n", stats.Total)
+			fmt.Printf("Waiting:     %d\n", stats.Waiting)
 			fmt.Printf("In Progress: %d\n", stats.InProgress)
-			fmt.Printf("Done:       %d\n", stats.Done)
+			fmt.Printf("Done:        %d\n", stats.Done)
 			fmt.Println()
 		}
 
@@ -561,26 +546,27 @@ func printRequestDetails(req *models.Request) {
 	color.Cyan("===============\n")
 
 	data := map[string]string{
-		"ID":       fmt.Sprintf("%d", req.ID),
-		"UUID":     req.UUID,
-		"Title":    req.Title,
-		"Status":   formatter.StatusColor(req.Status),
-		"Group":    req.GroupName,
-		"PIC":      req.PIC,
-		"Ref Link": req.RefLink,
+		"ID":     fmt.Sprintf("%d", req.ID),
+		"UUID":   req.UUID,
+		"Title":  req.Title,
+		"Status": formatter.StatusColor(req.Status),
+		"Token":  req.URLToken,
 	}
 
-	if req.StartPIC != "" {
-		data["Started By"] = req.StartPIC
+	if req.VendorName != nil && *req.VendorName != "" {
+		data["Vendor"] = *req.VendorName
 	}
-	if req.EndPIC != "" {
-		data["Finished By"] = req.EndPIC
+	if req.StartPIC != nil && *req.StartPIC != "" {
+		data["Started By"] = *req.StartPIC
+	}
+	if req.EndPIC != nil && *req.EndPIC != "" {
+		data["Finished By"] = *req.EndPIC
 	}
 
 	formatter.PrintKV(data)
 
-	if req.Description != "" {
-		fmt.Printf("\nDescription:\n%s\n", req.Description)
+	if req.Description != nil && *req.Description != "" {
+		fmt.Printf("\nDescription:\n%s\n", *req.Description)
 	}
 
 	if req.DurationSeconds != nil && *req.DurationSeconds > 0 {
@@ -590,13 +576,13 @@ func printRequestDetails(req *models.Request) {
 		fmt.Printf("Response Time: %s\n", output.DurationString(*req.ResponseTimeSeconds))
 	}
 
-	fmt.Printf("\nPublic URL: %s\n", req.PublicURL)
+	fmt.Printf("\nPublic URL: https://response-watch.web.app/t/%s\n", req.URLToken)
 	fmt.Println()
 }
 
 func printPremiumStats(stats *models.RequestStatsPremium) {
 	color.Cyan("\nPremium Statistics\n")
-	color.Cyan("==================\n")
+	color.Cyan("===================\n")
 	fmt.Printf("Total Requests:      %d\n", stats.Total)
 	fmt.Printf("Waiting:             %d\n", stats.Waiting)
 	fmt.Printf("In Progress:         %d\n", stats.InProgress)
@@ -604,22 +590,6 @@ func printPremiumStats(stats *models.RequestStatsPremium) {
 	fmt.Printf("Avg Response Time:   %.1f min\n", stats.AvgResponseTimeMinutes)
 	fmt.Printf("Avg Duration:        %.1f min\n", stats.AvgDurationMinutes)
 	fmt.Println()
-}
-
-func getString(m map[string]interface{}, key string) string {
-	if v, ok := m[key]; ok {
-		if s, ok := v.(string); ok {
-			return s
-		}
-	}
-	return ""
-}
-
-func formatTime(t string) string {
-	if len(t) > 10 {
-		return t[:10]
-	}
-	return t
 }
 
 func init() {
@@ -647,22 +617,20 @@ func init() {
 	// Flags for create
 	requestCreateCmd.Flags().StringVar(&reqTitle, "title", "", "Request title")
 	requestCreateCmd.Flags().StringVar(&reqDesc, "desc", "", "Description")
-	requestCreateCmd.Flags().IntVar(&reqGroup, "group", 0, "Vendor group ID")
-	requestCreateCmd.Flags().StringVar(&reqPIC, "pic", "", "PIC name")
-	requestCreateCmd.Flags().StringVar(&reqRefLink, "ref-link", "", "Reference link")
-	requestCreateCmd.Flags().BoolVar(&reqPin, "pin", false, "Pin this request")
+	requestCreateCmd.Flags().Int64Var(&reqGroup, "group", 0, "Vendor group ID")
+	requestCreateCmd.Flags().StringVar(&reqRefLink, "ref-link", "", "Followup link")
+	requestCreateCmd.Flags().BoolVar(&reqIsDescriptionSecure, "secure", false, "Enable secure description")
 	requestCreateCmd.Flags().BoolVar(&reqScheduled, "scheduled", false, "Schedule this request")
-	requestCreateCmd.Flags().StringVar(&reqScheduledAt, "scheduled-at", "", "Scheduled date (YYYY-MM-DD)")
+	requestCreateCmd.Flags().StringVar(&reqScheduledAt, "scheduled-at", "", "Scheduled time (RFC3339)")
 
 	// Flags for update
 	requestUpdateCmd.Flags().StringVar(&reqTitle, "title", "", "Request title")
 	requestUpdateCmd.Flags().StringVar(&reqDesc, "desc", "", "Description")
-	requestUpdateCmd.Flags().StringVar(&reqRefLink, "ref-link", "", "Reference link")
-	requestUpdateCmd.Flags().IntVar(&reqGroup, "group", 0, "Vendor group ID")
-	requestUpdateCmd.Flags().StringVar(&reqPIC, "pic", "", "PIC name")
+	requestUpdateCmd.Flags().StringVar(&reqRefLink, "ref-link", "", "Followup link")
+	requestUpdateCmd.Flags().Int64Var(&reqGroup, "group", 0, "Vendor group ID")
 
 	// Flags for assign
-	requestAssignCmd.Flags().IntVar(&reqGroup, "group-id", 0, "Vendor group ID")
+	requestAssignCmd.Flags().Int64Var(&reqGroup, "group-id", 0, "Vendor group ID")
 	requestAssignCmd.Flags().StringVar(&reqPIC, "pic", "", "PIC name")
 
 	// Flags for stats

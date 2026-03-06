@@ -14,9 +14,10 @@ import (
 )
 
 var (
-	groupName  string
-	groupPhone string
-	groupPICs  []string
+	groupName   string
+	groupPhone  string
+	groupPICs   []string
+	groupPICNames []string
 )
 
 // groupCmd represents the group command
@@ -41,40 +42,65 @@ var groupListCmd = &cobra.Command{
 			return err
 		}
 
-		var groups []models.VendorGroup
-		if err := client.Get("/vendor-groups", &groups, true); err != nil {
+		// Build query params
+		page, _ := cmd.Flags().GetInt("page")
+		limit, _ := cmd.Flags().GetInt("limit")
+		
+		query := fmt.Sprintf("?page=%d&limit=%d", page, limit)
+
+		var result models.VendorGroupListResponse
+		if err := client.Get("/vendor-groups"+query, &result, true); err != nil {
 			return fmt.Errorf("failed to list groups: %w", err)
 		}
 
-		if len(groups) == 0 {
+		if len(result.VendorGroups) == 0 {
 			formatter.PrintInfo("No vendor groups found")
 			return nil
 		}
 
 		if outputFmt == "json" {
-			return formatter.PrintJSON(groups)
+			return formatter.PrintJSON(result)
 		}
 
 		// Print table
 		headers := []string{"ID", "NAME", "PHONE", "PICS", "CREATED"}
 		rows := [][]string{}
 
-		for _, g := range groups {
-			pics := strings.Join(g.PICs, ", ")
+		for _, g := range result.VendorGroups {
+			// Format PICs
+			var picNames []string
+			for _, pic := range g.PICs {
+				picNames = append(picNames, pic.Name)
+			}
+			pics := strings.Join(picNames, ", ")
 			if len(pics) > 30 {
 				pics = pics[:27] + "..."
+			}
+			if pics == "" {
+				pics = "-"
+			}
+
+			phone := g.VendorPhone
+			if phone == "" {
+				phone = "-"
+			}
+
+			createdAt := "-"
+			if g.CreatedAt != "" {
+				createdAt = formatTime(g.CreatedAt)
 			}
 
 			rows = append(rows, []string{
 				fmt.Sprintf("%d", g.ID),
-				g.Name,
-				g.Phone,
+				g.GroupName,
+				phone,
 				pics,
-				g.CreatedAt[:10],
+				createdAt,
 			})
 		}
 
-		color.Cyan("\nVendor Groups\n")
+		color.Cyan("\nVendor Groups (Page %d/%d, Total: %d)\n", 
+			result.Pagination.Page, result.Pagination.TotalPages, result.Pagination.Total)
 		formatter.PrintTable(headers, rows)
 		fmt.Println()
 
@@ -113,18 +139,39 @@ var groupGetCmd = &cobra.Command{
 		color.Cyan("=============\n")
 
 		data := map[string]string{
-			"ID":      fmt.Sprintf("%d", group.ID),
-			"Name":    group.Name,
-			"Phone":   group.Phone,
-			"Created": group.CreatedAt,
+			"ID":        fmt.Sprintf("%d", group.ID),
+			"Name":      group.GroupName,
+			"Phone":     group.VendorPhone,
+			"Created":   group.CreatedAt,
+			"Updated":   group.UpdatedAt,
+		}
+		
+		if data["Phone"] == "" {
+			data["Phone"] = "-"
 		}
 
 		formatter.PrintKV(data)
 
 		fmt.Println("\nPICs:")
-		for i, pic := range group.PICs {
-			fmt.Printf("  %d. %s\n", i+1, pic)
+		if len(group.PICs) == 0 {
+			fmt.Println("  (none)")
 		}
+		for i, pic := range group.PICs {
+			phone := pic.Phone
+			if phone == "" {
+				phone = "-"
+			}
+			fmt.Printf("  %d. %s (Phone: %s)\n", i+1, pic.Name, phone)
+		}
+		
+		// Backward compatibility pic_names
+		if len(group.PICNames) > 0 && len(group.PICs) == 0 {
+			fmt.Println("\nPIC Names (legacy):")
+			for i, name := range group.PICNames {
+				fmt.Printf("  %d. %s\n", i+1, name)
+			}
+		}
+		
 		fmt.Println()
 
 		return nil
@@ -164,23 +211,39 @@ var groupCreateCmd = &cobra.Command{
 			groupPhone = strings.TrimSpace(phone)
 		}
 
-		if len(groupPICs) == 0 {
+		// Build PICs from legacy names if provided
+		var pics []models.PIC
+		if len(groupPICs) == 0 && len(groupPICNames) == 0 {
 			fmt.Println("Enter PIC names (empty line to finish):")
 			for {
-				fmt.Print("  - ")
-				pic, _ := reader.ReadString('\n')
-				pic = strings.TrimSpace(pic)
-				if pic == "" {
+				fmt.Print("  Name: ")
+				name, _ := reader.ReadString('\n')
+				name = strings.TrimSpace(name)
+				if name == "" {
 					break
 				}
-				groupPICs = append(groupPICs, pic)
+				fmt.Print("  Phone (optional): ")
+				phone, _ := reader.ReadString('\n')
+				phone = strings.TrimSpace(phone)
+				
+				pics = append(pics, models.PIC{Name: name, Phone: phone})
+			}
+		} else if len(groupPICs) > 0 {
+			// From --pics flag (comma-separated names only)
+			for _, name := range groupPICs {
+				pics = append(pics, models.PIC{Name: name})
+			}
+		} else if len(groupPICNames) > 0 {
+			// From --pic-names flag (legacy)
+			for _, name := range groupPICNames {
+				pics = append(pics, models.PIC{Name: name})
 			}
 		}
 
 		req := models.CreateVendorGroupRequest{
-			Name:  groupName,
-			Phone: groupPhone,
-			PICs:  groupPICs,
+			GroupName:   groupName,
+			VendorPhone: groupPhone,
+			PICs:        pics,
 		}
 
 		var created models.VendorGroup
@@ -188,7 +251,7 @@ var groupCreateCmd = &cobra.Command{
 			return fmt.Errorf("failed to create group: %w", err)
 		}
 
-		formatter.PrintSuccess(fmt.Sprintf("Group created: %s", created.Name))
+		formatter.PrintSuccess(fmt.Sprintf("Group created: %s (ID: %d)", created.GroupName, created.ID))
 		return nil
 	},
 }
@@ -221,50 +284,72 @@ var groupUpdateCmd = &cobra.Command{
 
 		// Name
 		if cmd.Flags().Changed("name") {
-			req.Name = groupName
+			req.GroupName = groupName
 		} else {
-			fmt.Printf("Name [%s]: ", current.Name)
+			fmt.Printf("Name [%s]: ", current.GroupName)
 			name, _ := reader.ReadString('\n')
 			name = strings.TrimSpace(name)
 			if name != "" {
-				req.Name = name
+				req.GroupName = name
 			}
 		}
 
 		// Phone
 		if cmd.Flags().Changed("phone") {
-			req.Phone = groupPhone
+			req.VendorPhone = groupPhone
 		} else {
-			fmt.Printf("Phone [%s]: ", current.Phone)
-			phone, _ := reader.ReadString('\n')
-			phone = strings.TrimSpace(phone)
-			if phone != "" {
-				req.Phone = phone
+			phone := current.VendorPhone
+			if phone == "" {
+				phone = "(none)"
+			}
+			fmt.Printf("Phone [%s]: ", phone)
+			newPhone, _ := reader.ReadString('\n')
+			newPhone = strings.TrimSpace(newPhone)
+			if newPhone != "" {
+				req.VendorPhone = newPhone
 			}
 		}
 
-		// PICs
-		if len(groupPICs) > 0 {
-			req.PICs = groupPICs
-		} else {
-			fmt.Printf("\nCurrent PICs: %s\n", strings.Join(current.PICs, ", "))
-			fmt.Println("Enter new PIC names (empty line to keep current, 'clear' to remove all):")
-			var newPICs []string
-			for {
-				fmt.Print("  - ")
-				pic, _ := reader.ReadString('\n')
-				pic = strings.TrimSpace(pic)
-				if pic == "" {
-					break
-				}
-				if pic == "clear" {
-					newPICs = []string{}
-					break
-				}
-				newPICs = append(newPICs, pic)
+		// PICs - interactive if not provided via flags
+		if !cmd.Flags().Changed("pics") && !cmd.Flags().Changed("pic-names") {
+			fmt.Printf("\nCurrent PICs:\n")
+			for i, pic := range current.PICs {
+				fmt.Printf("  %d. %s\n", i+1, pic.Name)
 			}
-			if len(newPICs) > 0 {
+			fmt.Println("\nEnter new PICs (name,phone per line, empty line to keep current, 'clear' to remove all):")
+			
+			var newPICs []models.PIC
+			for {
+				fmt.Print("  Name: ")
+				name, _ := reader.ReadString('\n')
+				name = strings.TrimSpace(name)
+				
+				if name == "" {
+					break
+				}
+				
+				if name == "clear" {
+					newPICs = []models.PIC{}
+					break
+				}
+				
+				fmt.Print("  Phone: ")
+				phone, _ := reader.ReadString('\n')
+				phone = strings.TrimSpace(phone)
+				
+				newPICs = append(newPICs, models.PIC{Name: name, Phone: phone})
+			}
+			
+			if len(newPICs) > 0 || (len(newPICs) == 0 && len(current.PICs) > 0) {
 				req.PICs = newPICs
+			}
+		} else if len(groupPICs) > 0 {
+			for _, name := range groupPICs {
+				req.PICs = append(req.PICs, models.PIC{Name: name})
+			}
+		} else if len(groupPICNames) > 0 {
+			for _, name := range groupPICNames {
+				req.PICs = append(req.PICs, models.PIC{Name: name})
 			}
 		}
 
@@ -327,13 +412,19 @@ func init() {
 	groupCmd.AddCommand(groupUpdateCmd)
 	groupCmd.AddCommand(groupDeleteCmd)
 
+	// Flags for list
+	groupListCmd.Flags().Int("page", 1, "Page number")
+	groupListCmd.Flags().Int("limit", 10, "Items per page")
+
 	// Flags for create
 	groupCreateCmd.Flags().StringVar(&groupName, "name", "", "Group name")
 	groupCreateCmd.Flags().StringVar(&groupPhone, "phone", "", "Phone number")
 	groupCreateCmd.Flags().StringSliceVar(&groupPICs, "pics", []string{}, "PIC names (comma-separated)")
+	groupCreateCmd.Flags().StringSliceVar(&groupPICNames, "pic-names", []string{}, "PIC names legacy (comma-separated)")
 
 	// Flags for update
 	groupUpdateCmd.Flags().StringVar(&groupName, "name", "", "Group name")
 	groupUpdateCmd.Flags().StringVar(&groupPhone, "phone", "", "Phone number")
 	groupUpdateCmd.Flags().StringSliceVar(&groupPICs, "pics", []string{}, "PIC names (comma-separated)")
+	groupUpdateCmd.Flags().StringSliceVar(&groupPICNames, "pic-names", []string{}, "PIC names legacy (comma-separated)")
 }

@@ -108,7 +108,11 @@ func (c *Client) refreshToken() error {
 	// Update config
 	c.Config.Auth.Token = refreshResp.AccessToken
 	c.Config.Auth.RefreshToken = refreshResp.RefreshToken
-	c.Config.Auth.ExpiresAt = time.Now().Add(time.Duration(refreshResp.ExpiresIn) * time.Second)
+	expiry := 24 * time.Hour
+	if refreshResp.ExpiresIn > 0 {
+		expiry = time.Duration(refreshResp.ExpiresIn) * time.Second
+	}
+	c.Config.Auth.ExpiresAt = time.Now().Add(expiry)
 
 	return c.Config.Save()
 }

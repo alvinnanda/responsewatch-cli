@@ -39,11 +39,13 @@ func (a *AuthAPI) Logout() error {
 
 // Me gets the current user profile
 func (a *AuthAPI) Me() (*models.User, error) {
-	var user models.User
-	if err := a.Client.Get("/auth/me", &user, true); err != nil {
+	var envelope struct {
+		User models.User `json:"user"`
+	}
+	if err := a.Client.Get("/auth/me", &envelope, true); err != nil {
 		return nil, err
 	}
-	return &user, nil
+	return &envelope.User, nil
 }
 
 // UpdateProfile updates the user profile
@@ -66,11 +68,23 @@ func (a *AuthAPI) ChangePassword(currentPassword, newPassword string) error {
 
 // SaveLogin saves login credentials to config
 func (a *AuthAPI) SaveLogin(resp *models.LoginResponse) error {
-	a.Client.Config.Auth.Token = resp.AccessToken
+	// Backend returns "token" field, use that primarily
+	token := resp.Token
+	if token == "" {
+		token = resp.AccessToken // Fallback
+	}
+	a.Client.Config.Auth.Token = token
 	a.Client.Config.Auth.RefreshToken = resp.RefreshToken
-	a.Client.Config.Auth.ExpiresAt = time.Now().Add(time.Duration(resp.ExpiresIn) * time.Second)
+	// Backend doesn't return expires_in, default to 24h
+	expiry := 24 * time.Hour
+	if resp.ExpiresIn > 0 {
+		expiry = time.Duration(resp.ExpiresIn) * time.Second
+	}
+	a.Client.Config.Auth.ExpiresAt = time.Now().Add(expiry)
 	a.Client.Config.User.Email = resp.User.Email
-	a.Client.Config.User.Name = resp.User.FullName
+	if resp.User.FullName != nil {
+		a.Client.Config.User.Name = *resp.User.FullName
+	}
 	return a.Client.Config.Save()
 }
 
@@ -114,7 +128,11 @@ func (a *AuthAPI) refreshToken() error {
 
 	a.Client.Config.Auth.Token = resp.AccessToken
 	a.Client.Config.Auth.RefreshToken = resp.RefreshToken
-	a.Client.Config.Auth.ExpiresAt = time.Now().Add(time.Duration(resp.ExpiresIn) * time.Second)
+	expiry := 24 * time.Hour
+	if resp.ExpiresIn > 0 {
+		expiry = time.Duration(resp.ExpiresIn) * time.Second
+	}
+	a.Client.Config.Auth.ExpiresAt = time.Now().Add(expiry)
 
 	return a.Client.Config.Save()
 }

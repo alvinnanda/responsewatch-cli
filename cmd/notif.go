@@ -34,25 +34,31 @@ var notifListCmd = &cobra.Command{
 			return err
 		}
 
-		var notifications []models.Notification
-		if err := client.Get("/notifications", &notifications, true); err != nil {
+		// Build query params
+		page, _ := cmd.Flags().GetInt("page")
+		limit, _ := cmd.Flags().GetInt("limit")
+		
+		query := fmt.Sprintf("?page=%d&limit=%d", page, limit)
+
+		var result models.NotificationListResponse
+		if err := client.Get("/notifications"+query, &result, true); err != nil {
 			return fmt.Errorf("failed to list notifications: %w", err)
 		}
 
-		if len(notifications) == 0 {
+		if len(result.Notifications) == 0 {
 			formatter.PrintInfo("No notifications found")
 			return nil
 		}
 
 		if outputFmt == "json" {
-			return formatter.PrintJSON(notifications)
+			return formatter.PrintJSON(result)
 		}
 
 		// Print table
 		headers := []string{"ID", "TYPE", "TITLE", "STATUS", "CREATED"}
 		rows := [][]string{}
 
-		for _, n := range notifications {
+		for _, n := range result.Notifications {
 			status := "Read"
 			if !n.IsRead {
 				status = color.YellowString("Unread")
@@ -63,11 +69,12 @@ var notifListCmd = &cobra.Command{
 				n.Type,
 				truncateString(n.Title, 30),
 				status,
-				n.CreatedAt.Format("2006-01-02 15:04"),
+				formatTime(n.CreatedAt),
 			})
 		}
 
-		color.Cyan("\nYour Notifications\n")
+		color.Cyan("\nYour Notifications (Page %d/%d, Total: %d)\n",
+			result.Pagination.Page, result.Pagination.TotalPages, result.Pagination.Total)
 		formatter.PrintTable(headers, rows)
 		fmt.Println()
 
@@ -88,9 +95,7 @@ var notifUnreadCmd = &cobra.Command{
 			return err
 		}
 
-		var result struct {
-			Count int `json:"count"`
-		}
+		var result models.UnreadCountResponse
 		if err := client.Get("/notifications/unread-count", &result, true); err != nil {
 			return fmt.Errorf("failed to get unread count: %w", err)
 		}
@@ -128,7 +133,8 @@ var notifReadCmd = &cobra.Command{
 			return err
 		}
 
-		if err := client.Post("/notifications/"+id+"/read", nil, nil, true); err != nil {
+		var result models.SuccessResponse
+		if err := client.Post("/notifications/"+id+"/read", nil, &result, true); err != nil {
 			return fmt.Errorf("failed to mark notification as read: %w", err)
 		}
 
@@ -159,7 +165,8 @@ var notifReadAllCmd = &cobra.Command{
 			return nil
 		}
 
-		if err := client.Post("/notifications/read-all", nil, nil, true); err != nil {
+		var result models.SuccessResponse
+		if err := client.Post("/notifications/read-all", nil, &result, true); err != nil {
 			return fmt.Errorf("failed to mark all as read: %w", err)
 		}
 
@@ -175,4 +182,8 @@ func init() {
 	notifCmd.AddCommand(notifUnreadCmd)
 	notifCmd.AddCommand(notifReadCmd)
 	notifCmd.AddCommand(notifReadAllCmd)
+
+	// Flags for list
+	notifListCmd.Flags().Int("page", 1, "Page number")
+	notifListCmd.Flags().Int("limit", 20, "Items per page")
 }
