@@ -152,7 +152,7 @@ type UpdateRequestRequest struct {
 
 type AssignVendorRequest struct {
 	VendorGroupID *int64 `json:"vendor_group_id,omitempty"`
-	PIC           string `json:"pic,omitempty"`
+	PICName       string `json:"pic_name,omitempty"`
 }
 
 type RequestStats struct {
@@ -177,8 +177,12 @@ type DailyStat struct {
 }
 
 type PublicRequestAction struct {
-	PIC   string `json:"pic,omitempty"`
-	Notes string `json:"notes,omitempty"`
+	PICName             string   `json:"pic_name,omitempty"`
+	Notes               string   `json:"notes,omitempty"`
+	CheckboxIssueMismatch bool   `json:"checkbox_issue_mismatch,omitempty"`
+	ResolutionNotes     *string  `json:"resolution_notes,omitempty"`
+	CompletionPhotoURL  *string  `json:"completion_photo_url,omitempty"`
+	CompletionPhotoURLs []string `json:"completion_photo_urls,omitempty"`
 }
 
 type PublicMonitoringResponse struct {

@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/boscod/responsewatch-cli/internal/config"
 	"github.com/boscod/responsewatch-cli/internal/output"
@@ -10,12 +11,12 @@ import (
 )
 
 var (
-	cfgFile    string
-	apiURL     string
-	outputFmt  string
-	noColor    bool
-	debugMode  bool
-	version    = "dev" // Set by build flags
+	cfgFile   string
+	apiURL    string
+	outputFmt string
+	noColor   bool
+	debugMode bool
+	version   = "dev" // Set by build flags
 
 	cfg       *config.Config
 	formatter *output.Formatter
@@ -111,4 +112,30 @@ func formatTime(t string) string {
 		return t[:10] // Return YYYY-MM-DD
 	}
 	return t
+}
+
+// extractToken parses a token from a URL if present, otherwise returns the input
+func extractToken(input string) string {
+	if strings.Contains(input, "/t/") {
+		parts := strings.Split(input, "/t/")
+		if len(parts) > 1 {
+			// Extract token and remove any query parameters
+			return strings.Split(parts[1], "?")[0]
+		}
+	}
+	// Return as is (could be a raw token, ID, or UUID)
+	return input
+}
+
+// isNumeric checks if a string consists only of digits
+func isNumeric(s string) bool {
+	if s == "" {
+		return false
+	}
+	for _, c := range s {
+		if c < '0' || c > '9' {
+			return false
+		}
+	}
+	return true
 }

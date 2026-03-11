@@ -110,26 +110,36 @@ var requestListCmd = &cobra.Command{
 
 // requestGetCmd represents the request get command
 var requestGetCmd = &cobra.Command{
-	Use:     "get [ID or UUID]",
+	Use:     "get [ID, UUID, or URL]",
 	Aliases: []string{"show", "view"},
 	Short:   "Get request details",
-	Long:    `Get detailed information about a specific request.`,
+	Long:    `Get detailed information about a specific request. If a public token/URL is provided, this works without login.`,
 	Args:    cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		id := args[0]
-
+		id := extractToken(args[0])
 		client := api.NewClient(cfg)
-		authAPI := api.NewAuthAPI(client)
-
-		if err := authAPI.CheckAuth(); err != nil {
-			return err
-		}
 
 		var req models.Request
+		var fetchErr error
+
+		// 1. Try public endpoint first if it's not a simple numeric ID
+		if !isNumeric(id) {
+			if err := client.Get("/public/t/"+id, &req, false); err == nil {
+				goto display
+			} else {
+				fetchErr = err
+			}
+		}
+
+		// 2. Fallback to authenticated endpoint
 		if err := client.Get("/requests/"+id, &req, true); err != nil {
+			if fetchErr != nil {
+				return fmt.Errorf("failed to get request (public: %v, private: %v)", fetchErr, err)
+			}
 			return fmt.Errorf("failed to get request: %w", err)
 		}
 
+	display:
 		if outputFmt == "json" {
 			return formatter.PrintJSON(req)
 		}
@@ -213,13 +223,13 @@ var requestCreateCmd = &cobra.Command{
 
 // requestUpdateCmd represents the request update command
 var requestUpdateCmd = &cobra.Command{
-	Use:     "update [ID or UUID]",
+	Use:     "update [ID, UUID, or URL]",
 	Aliases: []string{"edit"},
 	Short:   "Update a request",
 	Long:    `Update an existing request. Uses interactive prompts for fields not provided as flags.`,
 	Args:    cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		id := args[0]
+		id := extractToken(args[0])
 
 		client := api.NewClient(cfg)
 		authAPI := api.NewAuthAPI(client)
@@ -366,7 +376,7 @@ var requestAssignCmd = &cobra.Command{
 			req.VendorGroupID = &reqGroup
 		}
 		if reqPIC != "" {
-			req.PIC = reqPIC
+			req.PICName = reqPIC
 		}
 
 		var updated models.Request
@@ -472,12 +482,12 @@ var requestExportCmd = &cobra.Command{
 
 // requestStartCmd represents the request start command (public)
 var requestStartCmd = &cobra.Command{
-	Use:   "start [TOKEN]",
+	Use:   "start [TOKEN or URL]",
 	Short: "Start working on a request (public)",
 	Long:  `Mark a request as in-progress using its public token.`,
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		token := args[0]
+		token := extractToken(args[0])
 
 		client := api.NewClient(cfg)
 
@@ -492,7 +502,7 @@ var requestStartCmd = &cobra.Command{
 		}
 
 		req := models.PublicRequestAction{
-			PIC: pic,
+			PICName: pic,
 		}
 
 		var result models.Request
@@ -507,12 +517,12 @@ var requestStartCmd = &cobra.Command{
 
 // requestFinishCmd represents the request finish command (public)
 var requestFinishCmd = &cobra.Command{
-	Use:   "finish [TOKEN]",
+	Use:   "finish [TOKEN or URL]",
 	Short: "Finish working on a request (public)",
 	Long:  `Mark a request as done using its public token.`,
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		token := args[0]
+		token := extractToken(args[0])
 
 		client := api.NewClient(cfg)
 

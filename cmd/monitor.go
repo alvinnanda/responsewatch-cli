@@ -167,7 +167,7 @@ func printColumnHeader(title string, count int, colorFunc func(string, ...interf
 }
 
 func printCard(req models.Request, width int) {
-	id := fmt.Sprintf("%d", req.ID)
+	id := req.URLToken
 	title := req.Title
 	if len(title) > width-6 {
 		title = title[:width-9] + "..."
